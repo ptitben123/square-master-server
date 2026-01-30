@@ -170,6 +170,40 @@ app.post('/api/friends/list', async (req, res) => {
 
         res.json({ success: true, friends: user.friends, myCode: user.friendCode });
     } catch (err) { res.status(500).json({ error: "Erreur serveur." }); }
+});// Fonction utilitaire (si elle n'est pas déjà définie plus haut)
+function generateFriendCode() {
+    const random = Math.floor(1000 + Math.random() * 9000);
+    return `SQ-${random}`;
+}
+
+// --- ROUTE LISTE AMIS (VERSION CORRIGÉE) ---
+app.post('/api/friends/list', async (req, res) => {
+    try {
+        const { username } = req.body;
+        
+        // 1. On cherche le joueur
+        const user = await User.findOne({ username }).populate('friends', 'username gameState stats lastLogin currentSkin');
+        
+        if (!user) return res.status(404).json({ error: "Joueur introuvable" });
+
+        // 2. AUTO-RÉPARATION : Si le joueur n'a pas de code (vieux compte), on en crée un !
+        if (!user.friendCode) {
+            user.friendCode = generateFriendCode();
+            await user.save(); // On sauvegarde le nouveau code
+            console.log(`Code généré pour ${username} : ${user.friendCode}`);
+        }
+
+        // 3. On renvoie la liste ET le code
+        res.json({ 
+            success: true, 
+            friends: user.friends, 
+            myCode: user.friendCode 
+        });
+
+    } catch (err) { 
+        console.error(err);
+        res.status(500).json({ error: "Erreur serveur." }); 
+    }
 });
 
 // 3. SUPPRIMER UN AMI
@@ -198,6 +232,7 @@ app.post('/api/friends/remove', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Serveur en attente sur http://localhost:${PORT}`));
+
 
 
 
