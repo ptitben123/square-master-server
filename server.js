@@ -126,6 +126,78 @@ app.post('/api/save', async (req, res) => {
     }
 });
 
+// --- ROUTES SOCIALES (AMIS) ---
+
+// 1. AJOUTER UN AMI
+app.post('/api/friends/add', async (req, res) => {
+    try {
+        const { username, password, friendCode } = req.body;
+
+        // Vérif sécurité (C'est bien moi ?)
+        const me = await User.findOne({ username });
+        if (!me) return res.status(400).json({ error: "Erreur d'authentification." });
+        const isMatch = await bcrypt.compare(password, me.password);
+        if (!isMatch) return res.status(400).json({ error: "Mot de passe incorrect." });
+
+        // Chercher l'ami
+        const friend = await User.findOne({ friendCode: friendCode });
+        if (!friend) return res.status(404).json({ error: "Code ami introuvable." });
+
+        // Vérifications
+        if (friend.username === me.username) return res.status(400).json({ error: "Tu ne peux pas t'ajouter toi-même !" });
+        if (me.friends.includes(friend._id)) return res.status(400).json({ error: "Déjà dans ta liste d'amis." });
+
+        // Ajouter dans les deux sens (Amitié réciproque)
+        me.friends.push(friend._id);
+        friend.friends.push(me._id);
+
+        await me.save();
+        await friend.save();
+
+        res.json({ success: true, message: `Ami ${friend.username} ajouté !` });
+
+    } catch (err) { res.status(500).json({ error: "Erreur serveur." }); }
+});
+
+// 2. LISTE DES AMIS
+app.post('/api/friends/list', async (req, res) => {
+    try {
+        const { username } = req.body;
+        // On récupère le joueur et on "popule" (remplit) la liste d'amis avec leurs infos
+        const user = await User.findOne({ username }).populate('friends', 'username gameState stats lastLogin currentSkin friendCode');
+        
+        if (!user) return res.status(404).json({ error: "Joueur introuvable" });
+
+        res.json({ success: true, friends: user.friends, myCode: user.friendCode });
+    } catch (err) { res.status(500).json({ error: "Erreur serveur." }); }
+});
+
+// 3. SUPPRIMER UN AMI
+app.post('/api/friends/remove', async (req, res) => {
+    try {
+        const { username, password, friendId } = req.body;
+        
+        const me = await User.findOne({ username });
+        const isMatch = await bcrypt.compare(password, me.password);
+        if (!isMatch) return res.status(400).json({ error: "Auth incorrecte." });
+
+        const friend = await User.findById(friendId);
+
+        // Retirer de ma liste
+        me.friends = me.friends.filter(id => id.toString() !== friendId);
+        await me.save();
+
+        // Retirer de sa liste (optionnel, mais plus propre)
+        if(friend) {
+            friend.friends = friend.friends.filter(id => id.toString() !== me._id.toString());
+            await friend.save();
+        }
+
+        res.json({ success: true, message: "Ami supprimé." });
+    } catch (err) { res.status(500).json({ error: "Erreur serveur" }); }
+});
+
 app.listen(PORT, () => console.log(`🚀 Serveur en attente sur http://localhost:${PORT}`));
+
 
 
