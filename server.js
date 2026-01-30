@@ -74,4 +74,39 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
+// --- ROUTE 4 : SAUVEGARDE (MISE À JOUR) ---
+app.post('/api/save', async (req, res) => {
+    try {
+        const { username, password, data } = req.body;
+
+        // 1. Vérification de sécurité (Est-ce bien le bon joueur ?)
+        const user = await User.findOne({ username });
+        if (!user) return res.status(400).json({ error: "Joueur introuvable." });
+        
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ error: "Mot de passe incorrect." });
+
+        // 2. Mise à jour des données
+        if (data.score !== undefined) user.gameState.score = data.score;
+        if (data.coins !== undefined) user.gameState.coins = data.coins;
+        if (data.currentSkin) user.gameState.currentSkin = data.currentSkin;
+        
+        if (data.stats) user.stats = data.stats;
+        if (data.inventory) {
+            user.inventory.ownedSkins = data.inventory.ownedSkins;
+            user.inventory.ownedUpgrades = data.inventory.ownedUpgrades;
+        }
+        if (data.settings) user.settings = data.settings;
+
+        // 3. Valider dans la base de données
+        await user.save();
+        res.json({ success: true, message: "Sauvegarde Cloud OK !" });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Erreur lors de la sauvegarde." });
+    }
+});
+
 app.listen(PORT, () => console.log(`🚀 Serveur en attente sur http://localhost:${PORT}`));
+
