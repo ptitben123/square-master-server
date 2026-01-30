@@ -29,20 +29,38 @@ mongoose.connect(dbURI, {
 
 // --- ROUTES ---
 
+// Fonction pour générer un code ami (Ex: SQ-1234)
+function generateFriendCode() {
+    const random = Math.floor(1000 + Math.random() * 9000); // Nombre entre 1000 et 9999
+    return `SQ-${random}`;
+}
+
 app.post('/api/register', async (req, res) => {
     try {
         const { username, password } = req.body;
+        
         const existingUser = await User.findOne({ username });
         if (existingUser) return res.status(400).json({ error: "Ce pseudo est déjà pris !" });
+
         const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // On génère un code unique
+        let newFriendCode = generateFriendCode();
+        // (En théorie il faudrait vérifier qu'il n'existe pas déjà, mais c'est rare pour l'instant)
+
         const newUser = new User({
             username,
             password: hashedPassword,
+            friendCode: newFriendCode, // <--- NOUVEAU
             gameState: { score: 0, coins: 0, currentSkin: 'skin-default' }
         });
+
         await newUser.save();
-        res.json({ success: true, message: "Compte créé !" });
-    } catch (err) { res.status(500).json({ error: "Erreur serveur." }); }
+        res.json({ success: true, message: "Compte créé avec succès !" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Erreur lors de l'inscription." });
+    }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -109,4 +127,5 @@ app.post('/api/save', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Serveur en attente sur http://localhost:${PORT}`));
+
 
