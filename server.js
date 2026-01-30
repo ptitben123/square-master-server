@@ -1,0 +1,59 @@
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const User = require('./models/User');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+// 👇 LE LIEN STANDARD (Court)
+// J'ai mis le mot de passe "abcd1234". Change-le si ce n'est pas ça.
+const dbURI = "mongodb+srv://admin:abcd1234@cluster0.dlsfiac.mongodb.net/?appName=Cluster0";
+
+console.log("⏳ Connexion en cours vers MongoDB Atlas...");
+
+// 👇 LA SOLUTION MAGIQUE : "family: 4"
+mongoose.connect(dbURI, {
+    family: 4 // <--- C'EST ÇA QUI FORCE LE PASSAGE
+})
+.then(() => console.log("✅ VICTOIRE ABSOLUE ! Connecté à MongoDB !"))
+.catch(err => {
+    console.error("❌ Erreur détaillée :", err.message);
+    console.log("👉 Si ça échoue encore, on passera à l'hébergement Cloud (gratuit).");
+});
+
+// --- ROUTES ---
+
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const existingUser = await User.findOne({ username });
+        if (existingUser) return res.status(400).json({ error: "Ce pseudo est déjà pris !" });
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({
+            username,
+            password: hashedPassword,
+            gameState: { score: 0, coins: 0, currentSkin: 'skin-default' }
+        });
+        await newUser.save();
+        res.json({ success: true, message: "Compte créé !" });
+    } catch (err) { res.status(500).json({ error: "Erreur serveur." }); }
+});
+
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
+        if (!user) return res.status(400).json({ error: "Joueur inconnu." });
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ error: "Mauvais mot de passe." });
+        res.json({ success: true, message: "Connecté !", userData: user });
+    } catch (err) { res.status(500).json({ error: "Erreur connexion." }); }
+});
+
+app.listen(PORT, () => console.log(`🚀 Serveur en attente sur http://localhost:${PORT}`));
