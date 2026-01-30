@@ -56,4 +56,22 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Erreur connexion." }); }
 });
 
+// --- ROUTE 3 : LEADERBOARD (CLASSEMENT) ---
+app.get('/api/leaderboard', async (req, res) => {
+    try {
+        // 1. Chercher tous les joueurs
+        // 2. Trier par 'stats.highScore' en descendant (-1)
+        // 3. Garder les 10 premiers
+        // 4. Ne sélectionner que le pseudo, le score et le skin (PAS le mot de passe !)
+        const topPlayers = await User.find()
+            .sort({ "stats.highScore": -1 })
+            .limit(10)
+            .select("username stats.highScore gameState.currentSkin");
+
+        res.json({ success: true, leaderboard: topPlayers });
+    } catch (err) {
+        res.status(500).json({ error: "Impossible de récupérer le classement." });
+    }
+});
+
 app.listen(PORT, () => console.log(`🚀 Serveur en attente sur http://localhost:${PORT}`));
